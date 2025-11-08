@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TaskController } from './ui/task.controller';
+import { UiController } from './ui/ui.controller';
 import { TaskService } from './app/task.service';
 import { TaskSchema } from './schemas/task.schema';
 
@@ -17,7 +18,7 @@ import { TaskSchema } from './schemas/task.schema';
     }),
     MongooseModule.forFeature([{ name: 'Task', schema: TaskSchema }]),
   ],
-  controllers: [TaskController],
+  controllers: [TaskController, UiController],
   providers: [TaskService],
 })
 export class AppModule {}
