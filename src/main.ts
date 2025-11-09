@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableCors(); // Habilitar CORS
 
   // Swagger / OpenAPI setup
   const config = new DocumentBuilder()
@@ -17,9 +18,9 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(3000);
-  console.log('Application running on: http://localhost:3000');
-  console.log('Swagger UI available at: http://localhost:3000/api/docs');
+  await app.listen(3001);
+  console.log('Application running on: http://localhost:3001');
+  console.log('Swagger UI available at: http://localhost:3001/api/docs');
 }
 
 bootstrap();

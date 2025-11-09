@@ -1,85 +1,233 @@
 const apiRoot = '/tasks';
 
-async function fetchTasks(){
-  try{
-    const res = await fetch(apiRoot);
-    if(!res.ok) return [];
-    return res.json();
-  }catch(e){
-    console.error('Error fetching tasks', e);
-    return [];
-  }
-}
+// small UI helpers
+    function showLoading(show = true){
+      const el = document.getElementById('loading');
+      if(!el) return;
+      el.classList.toggle('hidden', !show);
+    }
 
-async function createTask(title){
-  const res = await fetch(apiRoot, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title})});
-  return res.json();
-}
+    function showToast(message, type = 'info'){
+      const container = document.getElementById('toast-container');
+      if(!container) return;
+      const t = document.createElement('div');
+      t.className = `toast toast-${type}`;
+      t.textContent = message;
+      container.appendChild(t);
+      setTimeout(()=>{ t.classList.add('hide'); setTimeout(()=>t.remove(),300); }, 3000);
+    }
 
-async function deleteTask(id){
-  await fetch(`${apiRoot}/${id}`, {method:'DELETE'});
-}
+    async function fetchTasks(){
+      try{
+        const res = await fetch(apiRoot);
+        if(!res.ok) throw new Error('No se pudo obtener tareas');
+        return res.json();
+      }catch(e){
+        console.error('Error fetching tasks', e);
+        showToast('Error al cargar tareas', 'danger');
+        return [];
+      }
+    }
 
-async function toggleComplete(task){
-  const updated = {...task, completed: !task.completed};
-  const res = await fetch(`${apiRoot}/${task._id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});
-  return res.json();
-}
+    async function createTask(data){
+      try{
+        const res = await fetch(apiRoot, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        if(!res.ok) throw new Error('create failed');
+        return res.json();
+      }catch(e){ showToast('Error al crear tarea','danger'); throw e; }
+    }
 
-function makeTaskElement(t){
-  const li = document.createElement('li');
-  li.className = 'task';
+    async function deleteTask(id){
+      try{
+        const res = await fetch(`${apiRoot}/${id}`, {method:'DELETE'});
+        if(!res.ok) throw new Error('delete failed');
+        return true;
+      }catch(e){ showToast('Error al eliminar','danger'); throw e; }
+    }
 
-  const left = document.createElement('div'); left.className='left';
-  const chk = document.createElement('input'); chk.type='checkbox'; chk.checked = !!t.completed;
-  chk.addEventListener('change', async ()=>{ await toggleComplete(t); load(); });
+    function isCompleted(task){
+      if (task.status !== undefined) return Number(task.status) === 1;
+      return !!task.completed;
+    }
 
-  const titleWrap = document.createElement('div');
-  const title = document.createElement('div'); title.textContent = t.title || '(sin título)'; title.className = 'task-title';
-  const meta = document.createElement('div'); meta.className='meta'; meta.textContent = t.completed ? 'Completada' : 'Abierta';
-  if(t.completed){ title.classList.add('completed'); }
+    async function toggleComplete(task){
+      try{
+        const newStatus = isCompleted(task) ? 0 : 1;
+  const payload = { ...task, status: newStatus };
+        const res = await fetch(`${apiRoot}/${task._id}`, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        if(!res.ok) throw new Error('update failed');
+        return res.json();
+      }catch(e){ showToast('Error al actualizar','danger'); throw e; }
+    }
 
-  titleWrap.appendChild(title); titleWrap.appendChild(meta);
-  left.appendChild(chk); left.appendChild(titleWrap);
+    async function updateTask(id, data){
+      try{
+        const res = await fetch(`${apiRoot}/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)});
+        if(!res.ok) throw new Error('update failed');
+        return res.json();
+      }catch(e){ showToast('Error al actualizar','danger'); throw e; }
+    }
 
-  const actions = document.createElement('div'); actions.className='task-actions';
-  const del = document.createElement('button'); del.textContent='Eliminar'; del.addEventListener('click', async ()=>{ await deleteTask(t._id); load(); });
-  actions.appendChild(del);
+    function makeTaskElement(t){
+      const li = document.createElement('li');
+      li.className = 'task-card';
 
-  li.appendChild(left); li.appendChild(actions);
-  return li;
-}
+      const header = document.createElement('div'); header.className = 'task-card-header';
+      const title = document.createElement('div'); title.className='task-card-title'; title.textContent = t.title || '(sin título)';
+      const meta = document.createElement('div'); meta.className='task-card-meta';
+      meta.textContent = isCompleted(t) ? 'Completada' : 'Pendiente';
+      header.appendChild(title); header.appendChild(meta);
 
-function renderTasks(tasks){
-  const list = document.getElementById('task-list');
-  const empty = document.getElementById('empty-state');
-  list.innerHTML = '';
-  if(!tasks || tasks.length === 0){
-    empty.style.display = 'block';
-    return;
-  }
-  empty.style.display = 'none';
-  tasks.forEach(t=>{
-    const el = makeTaskElement(t);
-    list.appendChild(el);
-  })
-}
+      const body = document.createElement('div'); body.className='task-card-body';
+      if(t.description) { const p = document.createElement('div'); p.className='task-desc'; p.textContent = t.description; body.appendChild(p); }
+      // due date + priority
+      const metaRow = document.createElement('div'); metaRow.className='task-meta-row';
+      if (t.dueDate) {
+        const d = document.createElement('div');
+        d.className = 'task-due';
+        try { d.textContent = new Date(t.dueDate).toLocaleDateString(); }
+        catch (err) { d.textContent = t.dueDate; }
+        metaRow.appendChild(d);
+      }
+      const pr = document.createElement('div');
+      pr.className = 'task-priority ' + (t.priority == 2 ? 'priority-high' : (t.priority == 1 ? 'priority-medium' : 'priority-low'));
+      let prLabel = 'Baja';
+      if (Number(t.priority) === 1) prLabel = 'Media';
+      if (Number(t.priority) === 2) prLabel = 'Alta';
+      pr.textContent = prLabel;
+      metaRow.appendChild(pr);
+      metaRow.appendChild(pr);
+      body.appendChild(metaRow);
 
-async function load(){
-  const tasks = await fetchTasks();
-  renderTasks(tasks);
-}
+      const footer = document.createElement('div'); footer.className='task-card-footer';
+  const left = document.createElement('div'); left.className = 'task-left';
+  const chk = document.createElement('input'); chk.type='checkbox'; chk.checked = isCompleted(t); chk.addEventListener('change', async ()=>{ showLoading(true); try{ await toggleComplete(t); showToast('Tarea actualizada','success'); await load(); }catch(e){ console.error(e); showToast('Error actualizando','danger'); } finally{ showLoading(false);} });
+      left.appendChild(chk);
 
-document.getElementById('create-form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const input = document.getElementById('title');
-  const title = input.value.trim();
-  if(!title) return;
-  await createTask(title);
-  input.value='';
-  load();
-});
+      const actions = document.createElement('div'); actions.className='task-actions';
+  const edit = document.createElement('button'); edit.className='btn'; edit.textContent='Editar'; edit.addEventListener('click', ()=>{ openModal('edit', t); });
+  const del = document.createElement('button'); del.className='btn btn-destructive'; del.textContent='Eliminar'; del.addEventListener('click', async ()=>{ if(!confirm('¿Eliminar esta tarea?')) return; showLoading(true); try{ await deleteTask(t._id); showToast('Tarea eliminada','success'); await load(); }catch(err){ console.error(err); showToast('Error eliminando','danger'); } finally{ showLoading(false);} });
+      actions.appendChild(edit); actions.appendChild(del);
 
-document.getElementById('refresh').addEventListener('click', ()=>load());
+      footer.appendChild(left); footer.appendChild(actions);
 
-load();
+      li.appendChild(header); li.appendChild(body); li.appendChild(footer);
+      return li;
+    }
+
+    function renderTasks(tasks){
+      const pendingList = document.getElementById('pending-list');
+      const completedList = document.getElementById('completed-list');
+      const pendingEmpty = document.getElementById('pending-empty');
+      const completedEmpty = document.getElementById('completed-empty');
+      const pendingCount = document.getElementById('pending-count');
+      const completedCount = document.getElementById('completed-count');
+
+      pendingList.innerHTML = '';
+      completedList.innerHTML = '';
+
+      const pending = [];
+      const completed = [];
+      for(const t of tasks || []){
+        const s = Number(t.status ?? 0);
+        if(s === 1) completed.push(t); else pending.push(t);
+      }
+
+      pendingCount.textContent = String(pending.length);
+      completedCount.textContent = String(completed.length);
+
+      if(pending.length === 0) pendingEmpty.classList.remove('hidden'); else pendingEmpty.classList.add('hidden');
+      if(completed.length === 0) completedEmpty.classList.remove('hidden'); else completedEmpty.classList.add('hidden');
+
+      for(const t of pending){
+        const el = makeTaskElement(t);
+        const p = Number(t.priority ?? 0);
+        if(p === 2) el.classList.add('priority-high-card');
+        else if(p === 1) el.classList.add('priority-medium-card');
+        else el.classList.add('priority-low-card');
+        pendingList.appendChild(el);
+      }
+      for(const t of completed){
+        const el = makeTaskElement(t);
+        const p = Number(t.priority ?? 0);
+        if(p === 2) el.classList.add('priority-high-card');
+        else if(p === 1) el.classList.add('priority-medium-card');
+        else el.classList.add('priority-low-card');
+        completedList.appendChild(el);
+      }
+    }
+
+    // Modal handling
+    let modalMode = 'create';
+    let modalEditingId = null;
+    function openModal(mode='create', task=null){
+      modalMode = mode; modalEditingId = task?._id || null;
+      document.getElementById('modal-title').textContent = mode === 'create' ? 'Nueva tarea' : 'Editar tarea';
+      document.getElementById('modal-title-input').value = task?.title || '';
+      document.getElementById('modal-desc-input').value = task?.description || '';
+      // populate new fields
+      const dueEl = document.getElementById('modal-due-input');
+      const prEl = document.getElementById('modal-priority-input');
+      const stEl = document.getElementById('modal-status-input');
+      if(dueEl){
+        dueEl.value = task && task.dueDate ? (new Date(task.dueDate)).toISOString().slice(0,10) : '';
+      }
+      if(prEl){
+        prEl.value = (task && task.priority !== undefined) ? String(task.priority) : '0';
+      }
+      if(stEl){
+        stEl.value = (task && task.status !== undefined) ? String(task.status) : '0';
+      }
+      document.getElementById('modal').classList.remove('hidden');
+    }
+    function closeModal(){ document.getElementById('modal').classList.add('hidden'); }
+
+    document.getElementById('modal-cancel').addEventListener('click', (e)=>{ e.preventDefault(); closeModal(); });
+    document.getElementById('modal-form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const title = document.getElementById('modal-title-input').value.trim();
+      const desc = document.getElementById('modal-desc-input').value.trim();
+      const due = document.getElementById('modal-due-input').value;
+  const priority = Number.parseInt(document.getElementById('modal-priority-input').value || '0', 10);
+  const status = Number.parseInt(document.getElementById('modal-status-input').value || '0', 10);
+      if(!title) return showToast('El título es obligatorio','danger');
+      closeModal(); showLoading(true);
+      try{
+        const payload = { userId: 'local-user', title, description: desc };
+        if(due) payload.dueDate = new Date(due).toISOString();
+        if(!Number.isNaN(priority)) payload.priority = priority;
+        if(!Number.isNaN(status)) payload.status = status;
+
+        if(modalMode === 'create'){
+          await createTask(payload);
+          showToast('Tarea creada','success');
+        }else{
+          await updateTask(modalEditingId, payload);
+          showToast('Tarea actualizada','success');
+        }
+        await load();
+      }catch(err){ console.error(err); showToast('Error procesando la tarea','danger'); }
+      finally{ showLoading(false); }
+    });
+
+    function openCreate(){ openModal('create'); }
+
+  document.getElementById('open-create').addEventListener('click', openCreate);
+
+    // basic search
+    document.getElementById('search').addEventListener('input', async (e)=>{
+      const q = e.target.value.trim().toLowerCase();
+      const tasks = await fetchTasks();
+      const filtered = tasks.filter(t=> (t.title||'').toLowerCase().includes(q) || (t.description||'').toLowerCase().includes(q));
+      renderTasks(filtered);
+    });
+
+    async function load(){ showLoading(true); try{ const tasks = await fetchTasks(); renderTasks(tasks);} finally{ showLoading(false); } }
+
+    // initial load
+    // call load after DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => { void load(); });
+    } else {
+      void load();
+    }
