@@ -95,8 +95,7 @@ const apiRoot = '/tasks';
       if (Number(t.priority) === 1) prLabel = 'Media';
       if (Number(t.priority) === 2) prLabel = 'Alta';
       pr.textContent = prLabel;
-      metaRow.appendChild(pr);
-      metaRow.appendChild(pr);
+  metaRow.appendChild(pr);
       body.appendChild(metaRow);
 
       const footer = document.createElement('div'); footer.className='task-card-footer';
@@ -135,6 +134,8 @@ const apiRoot = '/tasks';
 
       pendingCount.textContent = String(pending.length);
       completedCount.textContent = String(completed.length);
+  const totalCount = document.getElementById('total-count');
+  if(totalCount) totalCount.textContent = String(pending.length + completed.length);
 
       if(pending.length === 0) pendingEmpty.classList.remove('hidden'); else pendingEmpty.classList.add('hidden');
       if(completed.length === 0) completedEmpty.classList.remove('hidden'); else completedEmpty.classList.add('hidden');
