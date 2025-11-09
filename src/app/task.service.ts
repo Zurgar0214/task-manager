@@ -6,7 +6,7 @@ import { Task } from '../domain/entities/task.entity';
 @Injectable()
 export class TaskService {
   constructor(@InjectModel('Task') private taskModel: Model<Task>) {}
-
+//ensayo de commits
   async findAll() { return this.taskModel.find().exec(); }
   async findOne(id: string) { return this.taskModel.findById(id).exec(); }
   async create(data: Partial<Task>) { const task = new this.taskModel(data); return task.save(); }
